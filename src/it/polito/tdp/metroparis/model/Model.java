@@ -7,16 +7,23 @@ import java.util.List;
 import java.util.Map;
 
 import org.jgrapht.Graph;
+import org.jgrapht.GraphPath;
 import org.jgrapht.Graphs;
+import org.jgrapht.alg.shortestpath.DijkstraShortestPath;
 import org.jgrapht.event.ConnectedComponentTraversalEvent;
 import org.jgrapht.event.EdgeTraversalEvent;
 import org.jgrapht.event.TraversalListener;
 import org.jgrapht.event.VertexTraversalEvent;
 import org.jgrapht.graph.DefaultEdge;
+import org.jgrapht.graph.DefaultWeightedEdge;
 import org.jgrapht.graph.SimpleDirectedGraph;
+import org.jgrapht.graph.SimpleDirectedWeightedGraph;
 import org.jgrapht.traverse.BreadthFirstIterator;
 import org.jgrapht.traverse.DepthFirstIterator;
 import org.jgrapht.traverse.GraphIterator;
+
+import com.javadocmd.simplelatlng.LatLngTool;
+import com.javadocmd.simplelatlng.util.LengthUnit;
 
 import it.polito.tdp.metroparis.db.MetroDAO;
 
@@ -68,7 +75,8 @@ public class Model {
 	}
 	
 	//la classe Model internamente gestisce il grafo -> private
-	private Graph<Fermata, DefaultEdge> grafo;
+	//private Graph<Fermata, DefaultEdge> grafo;
+	private Graph<Fermata, DefaultWeightedEdge> grafo;
 	private List<Fermata> fermate;
 	private Map<Integer, Fermata> fermateIdMap;
 	private Map<Fermata,Fermata> backVisit;
@@ -76,7 +84,8 @@ public class Model {
 	public void creaGrafo() {
 		
 		//Crea l'oggetto grafo
-		this.grafo = new SimpleDirectedGraph<>(DefaultEdge.class);
+		//this.grafo = new SimpleDirectedGraph<>(DefaultEdge.class);
+		this.grafo = new SimpleDirectedWeightedGraph<>(DefaultWeightedEdge.class);
 		
 		//Aggiungi i vertici
 		MetroDAO dao = new MetroDAO();
@@ -109,7 +118,21 @@ public class Model {
 			}
 		}
 		
-		//opzione 3
+		//aggiungi i pesi agli archi
+		
+		List<ConnessioniVelocita> archipesati = dao.getConnessioneVelocita();
+		for(ConnessioniVelocita cp : archipesati) {
+			
+			Fermata partenza = fermateIdMap.get(cp.getStazP());
+			Fermata arrivo = fermateIdMap.get(cp.getStazA());
+			double distanza = LatLngTool.distance(partenza.getCoords(), arrivo.getCoords(), LengthUnit.KILOMETER);
+			double peso = distanza / cp.getVelocita() * 3600; //tempo in secondi
+			
+			grafo.setEdgeWeight(partenza, arrivo, peso);
+			
+			// oppure aggiungo archi e vertici insieme Graphs.addEdgeWithVertices(grafo, partenza, arrivo, peso);
+		}
+		
 		
 	}
 
@@ -199,6 +222,16 @@ public class Model {
 
 	public void setGrafo(Graph<Fermata, DefaultEdge> grafo) {
 		this.grafo = grafo;
+	}
+	
+	//se ho bisogno di calcolare tutti i cammini minimi usare l'algoritmo di floyd
+	
+	public List<Fermata>trovaCamminoMinimo(Fermata partenza, Fermata arrivo){
+		DijkstraShortestPath<Fermata, DefaultWeightedEdge> dijkstra = new DijkstraShortestPath<>(this.grafo);
+		GraphPath<Fermata, DefaultWeightedEdge> path = dijkstra.getPath(partenza, arrivo);
+		return path.getVertexList();
+		
+	
 	}
 
 }
